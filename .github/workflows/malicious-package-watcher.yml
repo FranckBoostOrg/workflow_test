@@ -41,7 +41,7 @@ jobs:
           ./scripts/boost/malicious-package-list.sh osm \
             --query "$OSM_QUERY" \
             --threshold "0" \
-            --from "${{ steps.since.outputs.from }}" \
+            --from "2026-05-20T01:41:01Z" \
             > packages.json
           cat packages.json
           count=$(jq 'length' packages.json)
