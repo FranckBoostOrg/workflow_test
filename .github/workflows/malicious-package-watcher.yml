@@ -37,8 +37,7 @@ jobs:
           OSM_API_KEY: ${{ secrets.OSM_API_KEY }}
         run: |
           set -euo pipefail
-          chmod +x ./scripts/boost/malicious-package-list.sh
-          ./scripts/boost/malicious-package-list.sh osm \
+          bash ./scripts/boost/malicious-package-list.sh osm \
             --query "$OSM_QUERY" \
             --threshold "0" \
             --from "2026-05-20T01:41:01Z" \
@@ -52,10 +51,9 @@ jobs:
         if: steps.fetch.outputs.count != '0'
         run: |
           set -euo pipefail
-          jq -n \
+          jq \
             --argjson count ${{ steps.fetch.outputs.count }} \
             --arg from "${{ steps.since.outputs.from }}" \
-            --rawfile pkgs packages.json \
             '{
               text: "New malicious package(s) detected on OpenSourceMalware",
               blocks: [
@@ -70,11 +68,11 @@ jobs:
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: ($pkgs[0] | map("• `\(.ecosystem):\(.name)` — \(.versions | join(", "))") | join("\n"))
+                    text: (. | map("• `\(.ecosystem):\(.name)` — Versions: \(.versions | join(", ")) - Weekly Download Count: \(.download_count_total)") | join("\n"))
                   }
                 }
               ]
-            }' > slack-payload.json
+            }' packages.json > slack-payload.json > slack-payload.json
 
       - name: Send Slack notification
         if: steps.fetch.outputs.count != '0'
