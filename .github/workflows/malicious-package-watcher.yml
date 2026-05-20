@@ -11,7 +11,7 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.0
 
       - name: Determine last successful run timestamp
         id: since
@@ -24,7 +24,7 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?status=success&per_page=1" \
             --jq '.workflow_runs[0].run_started_at // empty')
           if [[ -z "$from" ]]; then
-            from=$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
+            from=$(date -u -d '12 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
           fi
           echo "Using --from=$from"
           echo "from=$from" >> "$GITHUB_OUTPUT"
@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           bash ./scripts/boost/malicious-package-list.sh osm \
             --query "$OSM_QUERY" \
-            --threshold "$DOWNLOAD_THRESHOLD" \
+            --threshold "0" \
             --from "${{ steps.since.outputs.from }}" \
             > packages.json
           count=$(jq 'length' packages.json)
