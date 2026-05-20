@@ -1,0 +1,86 @@
+name: Malicious Package Watcher
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine last successful run timestamp
+        id: since
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: malicious-package-watcher.yml
+        run: |
+          set -euo pipefail
+          from=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_FILE}/runs?status=success&per_page=1" \
+            --jq '.workflow_runs[0].run_started_at // empty')
+          if [[ -z "$from" ]]; then
+            from=$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
+          fi
+          echo "Using --from=$from"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch malicious packages updated since last run
+        id: fetch
+        env:
+          OSM_QUERY: ${{ vars.OSM_QUERY }}
+          DOWNLOAD_THRESHOLD: ${{ vars.DOWNLOAD_THRESHOLD }}
+          OSM_API_KEY: ${{ secrets.OSM_API_KEY }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/boost/malicious-package-list.sh osm \
+            --query "$OSM_QUERY" \
+            --threshold "$DOWNLOAD_THRESHOLD" \
+            --from "${{ steps.since.outputs.from }}" \
+            > packages.json
+          count=$(jq 'length' packages.json)
+          echo "Found $count package(s)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Build Slack payload
+        if: steps.fetch.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          jq -n \
+            --argjson count ${{ steps.fetch.outputs.count }} \
+            --arg from "${{ steps.since.outputs.from }}" \
+            --rawfile pkgs packages.json \
+            '{
+              text: "New malicious package(s) detected on OpenSourceMalware",
+              blocks: [
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*\($count) new malicious package(s)* on OpenSourceMalware since `\($from)`"
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: ($pkgs[0] | map("• `\(.ecosystem):\(.name)` — \(.versions | join(", "))") | join("\n"))
+                  }
+                }
+              ]
+            }' > slack-payload.json
+
+      - name: Send Slack notification
+        if: steps.fetch.outputs.count != '0'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          curl -sSf -X POST \
+            -H 'Content-Type: application/json' \
+            --data @slack-payload.json \
+            "$SLACK_WEBHOOK_URL"
