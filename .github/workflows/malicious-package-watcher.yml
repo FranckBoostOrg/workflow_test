@@ -26,7 +26,7 @@ jobs:
           if [[ -z "$from" ]]; then
             from=$(date -u -d '12 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
           fi
-          echo "Using --from=$from"
+          echo "Using --from=2026-05-20T01:41:01Z"
           echo "from=$from" >> "$GITHUB_OUTPUT"
 
       - name: Fetch malicious packages updated since last run
