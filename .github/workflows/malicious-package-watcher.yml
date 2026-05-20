@@ -37,11 +37,13 @@ jobs:
           OSM_API_KEY: ${{ secrets.OSM_API_KEY }}
         run: |
           set -euo pipefail
-          bash ./scripts/boost/malicious-package-list.sh osm \
+          chmod +x ./scripts/boost/malicious-package-list.sh
+          ./scripts/boost/malicious-package-list.sh osm \
             --query "$OSM_QUERY" \
             --threshold "0" \
             --from "${{ steps.since.outputs.from }}" \
             > packages.json
+          cat packages.json
           count=$(jq 'length' packages.json)
           echo "Found $count package(s)"
           echo "count=$count" >> "$GITHUB_OUTPUT"
